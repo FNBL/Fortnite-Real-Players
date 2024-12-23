@@ -34,5 +34,4 @@ To get started with the app, follow these steps:
    ```
 
 
-## How to use:
-## Tutorial coming soon
+## [How to use (video)](https://cdn.ajaxfnc.com/uploads/.%2Frealplayers.mp4)
