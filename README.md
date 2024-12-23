@@ -5,6 +5,7 @@ This is a Python application created to track the amount of real players in a Fo
 ## Features
 
 - **Real-Time Tracking**: Track the amount of real players in real time.
+- **Real players update notifaction**: Shows a notifaction on the top left of your screen when the amount of real players updates.
 - **User-Friendly Interface**: Super easy-to-use interface (even a 5 year old can use this)
 
 ## Installation
@@ -13,7 +14,7 @@ To get started with the app, follow these steps:
 
 
 ### Use the compiled version (recommended):
-1. **Download the exe from github releases**
+1. **Download the exe from [github releases](github.com/AjaxFNC-YT/Fortnite-Real-Players/releases)**
 2. **Run the executable**
 
 ### Use the raw file:
@@ -31,3 +32,7 @@ To get started with the app, follow these steps:
    ```bash
    python realppl.py
    ```
+
+
+## How to use:
+## Tutorial coming soon
