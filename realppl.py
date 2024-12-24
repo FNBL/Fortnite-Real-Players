@@ -6,6 +6,7 @@ import json
 import os
 import webbrowser
 import asyncio
+import psutil
 import subprocess
 import aiohttp
 import threading
@@ -447,11 +448,13 @@ class App(customtkinter.CTk):
                 "taskkill /f /im FortniteLauncher.exe",
                 "taskkill /f /im FortniteClient-Win64-Shipping.exe",
                 "taskkill /f /im FortniteClient-Win64-Shipping_EAC.exe",
+                "taskkill /f /im FortniteClient-Win64-Shipping_EAC_EOS.exe",
                 "taskkill /f /im FortniteClient-Win64-Shipping_BE.exe",
                 "taskkill /f /im CrashReportClient.exe"
             ]
             for cmd in close_commands:
                 os.system(cmd)
+            self.ButtonLaunch.configure(text="Launch Game")
             return
         
         exchangeCode = asyncio.run(self.auth_handler.getExchangeCode(self.access_token))
@@ -463,9 +466,10 @@ class App(customtkinter.CTk):
         if performance:
             args.extend(["-NOTEXTURESTREAMING", "-USEALLAVAILABLECORES"])
             
-        launchCode = f"""start /d "{self.game_path}" FortniteLauncher.exe {' '.join(args)}"""
-        
-        os.system(launchCode)
+        launcher_path = os.path.join(self.game_path, "FortniteLauncher.exe")
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        subprocess.Popen([launcher_path] + args, cwd=self.game_path, startupinfo=startupinfo)
 
     def edit_gamePath(self):
         dialog = customtkinter.CTkInputDialog(
@@ -494,8 +498,19 @@ class App(customtkinter.CTk):
         self.save_settings()
 
     def checkGameRunning(self):
-        task_list = subprocess.check_output(['tasklist', '/FI', 'IMAGENAME eq FortniteLauncher.exe']).decode('utf-8')
-        return 'FortniteLauncher.exe' in task_list 
+        for proc in psutil.process_iter(['name']):
+            try:
+                if proc.info['name'] == 'FortniteLauncher.exe':
+                    return True
+                if proc.info['name'] == 'FortniteClient-Win64-Shipping.exe':
+                    return True
+                if proc.info['name'] == "FortniteClient-Win64-Shipping_EAC_EOS.exe":
+                    return True
+                if proc.info['name'] == "FortniteClient-Win64-Shipping_EAC.exe":
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        return False
 
     def start_auto_refresh(self):
         if not hasattr(self, 'auto_refresh_running') or not self.auto_refresh_running:
@@ -653,3 +668,4 @@ class App(customtkinter.CTk):
 if __name__ == "__main__":
     app = App()
     app.mainloop()
+
