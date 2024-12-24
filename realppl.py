@@ -6,11 +6,14 @@ import json
 import os
 import webbrowser
 import asyncio
+import subprocess
 import aiohttp
 import threading
 import win32gui
 import win32con
 import time
+from ctkdlib.custom_widgets import *
+
 
 customtkinter.set_appearance_mode("System")
 customtkinter.set_default_color_theme("blue")
@@ -86,6 +89,25 @@ class fortniteAuth():
                     return None
             except:
                 return None
+    async def getExchangeCode(self, accessToken: str, consumingClientId: str = None) -> str:
+        async with aiohttp.ClientSession() as session:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {accessToken}"
+                }
+                
+                url = "https://account-public-service-prod.ol.epicgames.com/account/api/oauth/exchange"
+                if consumingClientId is not None:
+                    url += f"?consumingClientId={consumingClientId}"
+                
+                async with session.get(url, 
+                                     headers=headers) as response:
+                    if response.status == 200:
+                        json_data = await response.json()
+                        return json_data.get("code")
+                    return None
+            except:
+                return None
 
     async def startAuthIfNotExists(self):
         if self.getAuthIfExists():
@@ -118,6 +140,7 @@ class fortniteAuth():
                                             self.app.auth_data = auth_data
                                             self.app.is_logged_in = True
                                             self.app.switch_page(self.app.Page_3)
+                                            self.app.update_ui_with_auth()
                                             
                                         self.app.after(0, update_app)
                                         break
@@ -188,7 +211,7 @@ class NotificationWindow(customtkinter.CTkToplevel):
 
 class App(customtkinter.CTk):
 
-    HEIGHT = 500
+    HEIGHT = 600
     WIDTH = 1000
 
     def __init__(self):
@@ -203,6 +226,7 @@ class App(customtkinter.CTk):
         self.notifications_enabled = True
         self.auto_refresh_task = None
         self.previous_players = None
+        self.game_path = "C:\\Program Files\\Epic Games\\Fortnite\\FortniteGame\\Binaries\\Win64"
         
         self.title("Real Players | V2 | Made by AjaxFNC")
         self.geometry(f"{App.WIDTH}x{App.HEIGHT}")
@@ -266,6 +290,21 @@ class App(customtkinter.CTk):
             height=37,
             text="Logout")
         self.Button3.place(x=210, y=430)
+        
+
+        self.ButtonLaunch = customtkinter.CTkButton(
+            self.Page_3,
+            bg_color=[
+                'gray86',
+                'gray17'],
+            font=customtkinter.CTkFont(
+                'Roboto',
+                size=19,
+                weight='bold'),
+            width=292,
+            height=37,
+            text="Launch Game")
+        self.ButtonLaunch.place(x=210, y=385)
 
         self.Button4 = customtkinter.CTkButton(
             self.Page_3,
@@ -354,6 +393,8 @@ class App(customtkinter.CTk):
         self.Button1.configure(command=self.handle_auth)
         self.Button2.configure(command=lambda: self.switch_page(self.Page_1))
         self.Button3.configure(command=self.handle_logout)
+        self.ButtonLaunch.configure(command=self.handle_launch)
+        CTkPopupMenu(self.ButtonLaunch, popup_type=0, values={'Launch Game': self.handle_launch, 'Launch Game (All cores)': lambda: self.handle_launch(performance=True), 'Change Game Path': self.edit_gamePath}, corner_radius=6)
         self.Button4.configure(command=self.handle_refresh_wrapper)
         self.CheckBox1.configure(command=self.toggle_auto_refresh)
         self.CheckBox2.configure(command=self.toggle_notifications)
@@ -397,6 +438,49 @@ class App(customtkinter.CTk):
         self.stop_auto_refresh()
         self.switch_page(self.Page_1)
 
+    def handle_launch(self, performance=False):
+        if not self.auth_data:
+            return
+            
+        if self.checkGameRunning():
+            close_commands = [
+                "taskkill /f /im FortniteLauncher.exe",
+                "taskkill /f /im FortniteClient-Win64-Shipping.exe",
+                "taskkill /f /im FortniteClient-Win64-Shipping_EAC.exe",
+                "taskkill /f /im FortniteClient-Win64-Shipping_BE.exe",
+                "taskkill /f /im CrashReportClient.exe"
+            ]
+            for cmd in close_commands:
+                os.system(cmd)
+            return
+        
+        exchangeCode = asyncio.run(self.auth_handler.getExchangeCode(self.access_token))
+        auth_data = self.auth_data
+        
+        args = ["-AUTH_LOGIN=unused", f"-AUTH_PASSWORD={exchangeCode}", "-AUTH_TYPE=exchangecode", 
+                "-epicapp=Fortnite", "-epicenv=Prod", "-EpicPortal", f"-epicuserid={auth_data['accountId']}"]
+                
+        if performance:
+            args.extend(["-NOTEXTURESTREAMING", "-USEALLAVAILABLECORES"])
+            
+        launchCode = f"""start /d "{self.game_path}" FortniteLauncher.exe {' '.join(args)}"""
+        
+        os.system(launchCode)
+
+    def edit_gamePath(self):
+        dialog = customtkinter.CTkInputDialog(
+            text="Enter Fortnite Game Path (Make sure its the win64 folder):\n\nCurrent:\n" + self.game_path,
+            title="Change Game Path"
+        )
+        new_path = dialog.get_input()
+        if new_path:
+            if os.path.exists(new_path) and os.path.exists(os.path.join(new_path, "FortniteLauncher.exe")):
+                self.game_path = new_path
+                self.save_settings()
+                self.show_message("Success", "Game path updated successfully!")
+            else:
+                self.show_message("Error", "Invalid path: FortniteLauncher.exe not found")
+
     def toggle_auto_refresh(self):
         self.auto_refresh_enabled = self.CheckBox1.get()
         if self.auto_refresh_enabled:
@@ -408,6 +492,10 @@ class App(customtkinter.CTk):
     def toggle_notifications(self):
         self.notifications_enabled = self.CheckBox2.get()
         self.save_settings()
+
+    def checkGameRunning(self):
+        task_list = subprocess.check_output(['tasklist', '/FI', 'IMAGENAME eq FortniteLauncher.exe']).decode('utf-8')
+        return 'FortniteLauncher.exe' in task_list 
 
     def start_auto_refresh(self):
         if not hasattr(self, 'auto_refresh_running') or not self.auto_refresh_running:
@@ -423,6 +511,15 @@ class App(customtkinter.CTk):
 
     def handle_refresh_wrapper(self):
         threading.Thread(target=self.refresh_thread, daemon=True).start()
+        threading.Thread(target=self.handle_game_running, daemon=True).start()
+
+    def handle_game_running(self):
+        isGameRunning = self.checkGameRunning()
+        if isGameRunning:
+            self.ButtonLaunch.configure(text="Close Game")
+        else:
+            self.ButtonLaunch.configure(text="Launch Game")
+
 
     def refresh_thread(self):
         asyncio.run(self.handle_refresh())
@@ -509,37 +606,46 @@ class App(customtkinter.CTk):
             except Exception as e:
                 print(f"Error showing notification: {str(e)}")
 
+    def show_message(self, title, message):
+        dialog = customtkinter.CTkToplevel(self)
+        dialog.title(title)
+        dialog.geometry("300x100")
+        dialog.resizable(False, False)
+        
+        # Center the dialog on screen
+        dialog.update()
+        x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
+        y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        label = customtkinter.CTkLabel(dialog, text=message)
+        label.pack(expand=True)
+        
+        dialog.after(2000, dialog.destroy)
+        dialog.grab_set()
+
     def save_settings(self):
-        settings = {
-            "auto_refresh": self.auto_refresh_enabled,
-            "show_notifications": self.notifications_enabled
-        }
-        os.makedirs(os.path.dirname(savedDataPath), exist_ok=True)
-        with open(savedDataPath, "w") as f:
-            json.dump(settings, f)
+        with open(".settings/settings.json", "w") as f:
+            json.dump({
+                "auto_refresh": int(self.auto_refresh_enabled),
+                "show_notifications": int(self.notifications_enabled),
+                "game_path": self.game_path
+            }, f)
 
     def load_settings(self):
         try:
-            if os.path.exists(savedDataPath):
-                with open(savedDataPath, "r") as f:
-                    settings = json.load(f)
-                    self.auto_refresh_enabled = settings.get("auto_refresh", True)
-                    self.notifications_enabled = settings.get("show_notifications", True)
-                    
-                    if self.auto_refresh_enabled:
-                        self.CheckBox1.select()
-                    else:
-                        self.CheckBox1.deselect()
-                        
-                    if self.notifications_enabled:
-                        self.CheckBox2.select()
-                    else:
-                        self.CheckBox2.deselect()
+            with open(".settings/settings.json", "r") as f:
+                settings = json.load(f)
+                self.auto_refresh_enabled = bool(settings.get("auto_refresh", True))
+                self.notifications_enabled = bool(settings.get("show_notifications", True))
+                self.game_path = settings.get("game_path", "C:\\Program Files\\Epic Games\\Fortnite\\FortniteGame\\Binaries\\Win64")
+                
+                if not self.auto_refresh_enabled:
+                    self.CheckBox1.deselect()
+                if not self.notifications_enabled:
+                    self.CheckBox2.deselect()
         except:
-            self.auto_refresh_enabled = True
-            self.notifications_enabled = True
-            self.CheckBox1.select()
-            self.CheckBox2.select()
+            self.save_settings()
 
 if __name__ == "__main__":
     app = App()
