@@ -2,3 +2,5 @@ customtkinter>=5.2.0
 aiohttp>=3.8.0
 pywin32>=306
 ctkdlib
+subprocess
+psutil
