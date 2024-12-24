@@ -14,7 +14,7 @@ To get started with the app, follow these steps:
 
 
 ### Use the compiled version (recommended):
-1. **Download the exe from [github releases](github.com/AjaxFNC-YT/Fortnite-Real-Players/releases)**
+1. **Download the exe from [github releases](https://github.com/AjaxFNC-YT/Fortnite-Real-Players/releases)**
 2. **Run the executable**
 
 ### Use the raw file:
