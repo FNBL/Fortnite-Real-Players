@@ -612,7 +612,6 @@ class App(customtkinter.CTk):
         dialog.geometry("300x100")
         dialog.resizable(False, False)
         
-        # Center the dialog on screen
         dialog.update()
         x = (dialog.winfo_screenwidth() - dialog.winfo_width()) // 2
         y = (dialog.winfo_screenheight() - dialog.winfo_height()) // 2
@@ -625,6 +624,8 @@ class App(customtkinter.CTk):
         dialog.grab_set()
 
     def save_settings(self):
+        if not os.path.exists(".settings"):
+            os.makedirs(".settings")
         with open(".settings/settings.json", "w") as f:
             json.dump({
                 "auto_refresh": int(self.auto_refresh_enabled),
@@ -634,6 +635,8 @@ class App(customtkinter.CTk):
 
     def load_settings(self):
         try:
+            if not os.path.exists(".settings/settings.json"):
+                self.save_settings()
             with open(".settings/settings.json", "r") as f:
                 settings = json.load(f)
                 self.auto_refresh_enabled = bool(settings.get("auto_refresh", True))
